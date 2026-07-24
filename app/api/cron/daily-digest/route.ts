@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { buildDigest } from "@/lib/mlb";
 import { renderDigestEmail } from "@/lib/email-template";
-import prospects from "@/data/prospects.json";
+import { getProspects } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const prospects = await getProspects();
   const digests = await buildDigest(prospects);
   const { subject, html } = renderDigestEmail(digests);
 

@@ -1,7 +1,26 @@
-export type Team = {
-  name: string;
-  id: number;
-  sportId: number;
+import { archiveGame } from "./db";
+import type {
+  Boxscore,
+  BoxscoreTeam,
+  GameDigest,
+  GameSummary,
+  PlayerLine,
+  Prospect,
+  ProspectAppearance,
+  Team,
+  TeamDigest,
+} from "./types";
+
+export type {
+  Boxscore,
+  BoxscoreTeam,
+  GameDigest,
+  GameSummary,
+  PlayerLine,
+  Prospect,
+  ProspectAppearance,
+  Team,
+  TeamDigest,
 };
 
 export const TEAMS: Team[] = [
@@ -20,17 +39,6 @@ type ScheduleGame = {
     away: { team: { id: number; name: string }; score?: number; isWinner?: boolean };
     home: { team: { id: number; name: string }; score?: number; isWinner?: boolean };
   };
-};
-
-export type GameSummary = {
-  gamePk: number;
-  date: string;
-  status: string;
-  opponent: string;
-  isHome: boolean;
-  teamScore: number | null;
-  oppScore: number | null;
-  result: "W" | "L" | "T" | null;
 };
 
 function yesterdayISO(): string {
@@ -90,25 +98,6 @@ export async function getMostRecentGames(
     });
 }
 
-export type PlayerLine = {
-  id: number;
-  name: string;
-  position: string;
-  summary: string;
-};
-
-export type BoxscoreTeam = {
-  teamName: string;
-  batters: PlayerLine[];
-  pitchers: PlayerLine[];
-};
-
-export type Boxscore = {
-  gamePk: number;
-  away: BoxscoreTeam;
-  home: BoxscoreTeam;
-};
-
 export async function getBoxscore(gamePk: number): Promise<Boxscore> {
   const res = await fetch(`${API_BASE}/game/${gamePk}/boxscore`, {
     next: { revalidate: 3600 },
@@ -157,24 +146,14 @@ export async function getBoxscore(gamePk: number): Promise<Boxscore> {
   };
 }
 
-export type Prospect = {
-  name: string;
-  mlbId: number;
-};
-
-export type ProspectAppearance = Prospect & {
-  team: string;
-  battingSummary?: string;
-  pitchingSummary?: string;
-};
-
 export function matchProspects(
   boxscore: Boxscore,
   prospects: Prospect[]
 ): ProspectAppearance[] {
+  const tracked = prospects.filter((p) => p.mlbId !== null);
   const appearances: ProspectAppearance[] = [];
   for (const side of [boxscore.away, boxscore.home]) {
-    for (const prospect of prospects) {
+    for (const prospect of tracked) {
       const batLine = side.batters.find((p) => p.id === prospect.mlbId);
       const pitchLine = side.pitchers.find((p) => p.id === prospect.mlbId);
       if (batLine || pitchLine) {
@@ -190,17 +169,6 @@ export function matchProspects(
   return appearances;
 }
 
-export type GameDigest = {
-  game: GameSummary;
-  boxscore: Boxscore;
-  prospectAppearances: ProspectAppearance[];
-};
-
-export type TeamDigest = {
-  team: Team;
-  games: GameDigest[];
-};
-
 export async function buildDigest(prospects: Prospect[]): Promise<TeamDigest[]> {
   return Promise.all(
     TEAMS.map(async (team): Promise<TeamDigest> => {
@@ -209,6 +177,19 @@ export async function buildDigest(prospects: Prospect[]): Promise<TeamDigest[]> 
         games.map(async (game): Promise<GameDigest> => {
           const boxscore = await getBoxscore(game.gamePk);
           const prospectAppearances = matchProspects(boxscore, prospects);
+          await archiveGame({
+            gamePk: game.gamePk,
+            teamId: team.id,
+            teamName: team.name,
+            opponent: game.opponent,
+            isHome: game.isHome,
+            date: game.date,
+            teamScore: game.teamScore,
+            oppScore: game.oppScore,
+            result: game.result,
+            boxscore,
+            prospectAppearances,
+          });
           return { game, boxscore, prospectAppearances };
         })
       );
