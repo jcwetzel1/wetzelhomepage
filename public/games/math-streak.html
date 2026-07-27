@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Math Streak!</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['"Baloo 2"', '"Comic Sans MS"', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'Consolas', 'monospace'],
+        }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  body { font-family: 'Nunito', system-ui, sans-serif; }
+  .font-display { font-family: 'Baloo 2', 'Comic Sans MS', system-ui, sans-serif; }
+  @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+  .animate-pop { animation: pop 0.35s ease-out; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+  .animate-shake { animation: shake 0.4s ease-in-out; }
+  @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-40px); opacity: 0; } }
+  .animate-float { animation: floatUp 0.9s ease-out forwards; }
+  .badge-locked { filter: grayscale(1) opacity(0.35); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 4px; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-violet-100 via-sky-100 to-emerald-100 text-slate-800 min-h-screen">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ============================== UTILITIES ============================== */
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+function randChoice(arr) {
+  return arr[randInt(0, arr.length - 1)];
+}
+function gcd(a, b) {
+  a = Math.abs(a); b = Math.abs(b);
+  while (b) { [a, b] = [b, a % b]; }
+  return a || 1;
+}
+function simplifyFraction(n, d) {
+  if (d < 0) { n = -n; d = -d; }
+  const g = gcd(n, d);
+  return [n / g, d / g];
+}
+function round1(x) { return Math.round(x * 10) / 10; }
+
+const NAMES = ["Maya", "Leo", "Priya", "Jack", "Ava", "Noah", "Zoe", "Sam", "Ruby", "Omar", "Ellie", "Finn"];
+const ITEMS = ["stickers", "marbles", "trading cards", "cookies", "comic books", "seashells", "coins", "erasers", "toy cars", "jellybeans"];
+
+/* ============================== DIFFICULTY ============================== */
+
+function tierForStreak(streak) {
+  return Math.min(1 + Math.floor(streak / 3), 10);
+}
+
+/* ============================== TOPIC GENERATORS ============================== */
+
+function genArithmetic(tier) {
+  const orderOfOps = tier >= 4 && Math.random() < 0.4;
+  if (orderOfOps) {
+    const b = randInt(2, 4 + Math.floor(tier / 2));
+    const c = randInt(2, 4 + Math.floor(tier / 2));
+    const a = randInt(2, 8 + tier * 3);
+    const pattern = randChoice(["a+b*c", "a*b+c", "(a+b)*c", "a-b*c"]);
+    let question, answer, explanation;
+    if (pattern === "a+b*c") {
+      answer = a + b * c;
+      question = `${a} + ${b} × ${c} = ?`;
+      explanation = `Multiply first: ${b} × ${c} = ${b * c}. Then add: ${a} + ${b * c} = ${answer}.`;
+    } else if (pattern === "a*b+c") {
+      answer = a * b + c;
+      question = `${a} × ${b} + ${c} = ?`;
+      explanation = `Multiply first: ${a} × ${b} = ${a * b}. Then add: ${a * b} + ${c} = ${answer}.`;
+    } else if (pattern === "(a+b)*c") {
+      answer = (a + b) * c;
+      question = `(${a} + ${b}) × ${c} = ?`;
+      explanation = `Do the parentheses first: ${a} + ${b} = ${a + b}. Then multiply: ${a + b} × ${c} = ${answer}.`;
+    } else {
+      const bc = b * c;
+      const safeA = a + bc;
+      answer = safeA - bc;
+      question = `${safeA} - ${b} × ${c} = ?`;
+      explanation = `Multiply first: ${b} × ${c} = ${bc}. Then subtract: ${safeA} - ${bc} = ${answer}.`;
+    }
+    return { topic: "Arithmetic", icon: "➕", tier, question, answer, explanation, inputType: "number" };
+  }
+
+  const op = randChoice(["+", "-", "×", "÷"]);
+  const addMax = 15 + tier * 12;
+  let question, answer, explanation;
+  if (op === "+") {
+    const x = randInt(tier > 3 ? 20 : 1, addMax);
+    const y = randInt(tier > 3 ? 20 : 1, addMax);
+    answer = x + y;
+    question = `${x} + ${y} = ?`;
+    explanation = `Add the two numbers: ${x} + ${y} = ${answer}.`;
+  } else if (op === "-") {
+    let x = randInt(tier > 3 ? 20 : 1, addMax);
+    let y = randInt(1, addMax);
+    if (y > x) [x, y] = [y, x];
+    answer = x - y;
+    question = `${x} - ${y} = ?`;
+    explanation = `Subtract: ${x} - ${y} = ${answer}.`;
+  } else if (op === "×") {
+    const fMax = 5 + tier;
+    const x = randInt(2, fMax);
+    const y = randInt(2, tier >= 4 ? 20 + tier : fMax);
+    answer = x * y;
+    question = `${x} × ${y} = ?`;
+    explanation = `Multiply: ${x} × ${y} = ${answer}.`;
+  } else {
+    const divisor = randInt(2, 6 + tier);
+    const quotient = randInt(2, 6 + tier);
+    const dividend = divisor * quotient;
+    answer = quotient;
+    question = `${dividend} ÷ ${divisor} = ?`;
+    explanation = `Think: ${divisor} × ? = ${dividend}. Since ${divisor} × ${quotient} = ${dividend}, the answer is ${quotient}.`;
+  }
+  return { topic: "Arithmetic", icon: "➕", tier, question, answer, explanation, inputType: "number" };
+}
+
+function genFractionsDecimals(tier) {
+  const useDecimal = Math.random() < 0.5;
+  if (useDecimal) {
+    const places = tier >= 5 ? 2 : 1;
+    const scale = Math.pow(10, places);
+    const opts = tier >= 3 ? ["+", "-", "×"] : ["+", "-"];
+    const op = randChoice(opts);
+    const maxWhole = 3 + Math.floor(tier / 2);
+    let x = round1(randInt(1, maxWhole * scale) / scale);
+    let y = round1(randInt(1, maxWhole * scale) / scale);
+    let question, answer, explanation;
+    if (op === "+") {
+      answer = round1(x + y);
+      question = `${x} + ${y} = ?`;
+      explanation = `Line up the decimal points and add: ${x} + ${y} = ${answer}.`;
+    } else if (op === "-") {
+      if (y > x) [x, y] = [y, x];
+      answer = round1(x - y);
+      question = `${x} - ${y} = ?`;
+      explanation = `Line up the decimal points and subtract: ${x} - ${y} = ${answer}.`;
+    } else {
+      const smallY = randInt(2, 9);
+      answer = round1(x * smallY);
+      question = `${x} × ${smallY} = ?`;
+      explanation = `Multiply as if there's no decimal point (${Math.round(x * 10)} × ${smallY}), then place the decimal: ${x} × ${smallY} = ${answer}.`;
+    }
+    return { topic: "Fractions & Decimals", icon: "½", tier, question, answer, explanation, inputType: "decimal" };
+  }
+
+  const denomPool = tier <= 2 ? [2, 3, 4, 5, 6] : tier <= 5 ? [2, 3, 4, 5, 6, 8, 9, 10] : [2, 3, 4, 5, 6, 8, 9, 10, 12];
+  const opts = tier >= 3 ? ["+", "-", "×"] : ["+", "-"];
+  const op = randChoice(opts);
+
+  if (op === "×") {
+    const n1 = randInt(1, 5), d1 = randChoice(denomPool);
+    const n2 = randInt(1, 5), d2 = randChoice(denomPool);
+    const [an, ad] = simplifyFraction(n1 * n2, d1 * d2);
+    const question = `${n1}/${d1} × ${n2}/${d2} = ? (as a fraction, e.g. 3/4)`;
+    const explanation = `Multiply the numerators: ${n1} × ${n2} = ${n1 * n2}. Multiply the denominators: ${d1} × ${d2} = ${d1 * d2}. So ${n1}/${d1} × ${n2}/${d2} = ${n1 * n2}/${d1 * d2}, which simplifies to ${an}/${ad}.`;
+    return { topic: "Fractions & Decimals", icon: "½", tier, question, answer: { num: an, den: ad }, explanation, inputType: "fraction" };
+  }
+
+  let d1 = randChoice(denomPool);
+  let d2 = randChoice(denomPool);
+  const lcd = (d1 * d2) / gcd(d1, d2);
+  let n1 = randInt(1, d1 - 1);
+  let n2 = randInt(1, d2 - 1);
+  const scaled1 = n1 * (lcd / d1);
+  const scaled2 = n2 * (lcd / d2);
+  let resultNum, question, explanation;
+  if (op === "+") {
+    resultNum = scaled1 + scaled2;
+    const [an, ad] = simplifyFraction(resultNum, lcd);
+    question = `${n1}/${d1} + ${n2}/${d2} = ? (as a fraction, e.g. 3/4)`;
+    explanation = `Find a common denominator (${lcd}): ${n1}/${d1} = ${scaled1}/${lcd} and ${n2}/${d2} = ${scaled2}/${lcd}. Add the numerators: ${scaled1} + ${scaled2} = ${resultNum}. So the sum is ${resultNum}/${lcd}, which simplifies to ${an}/${ad}.`;
+    return { topic: "Fractions & Decimals", icon: "½", tier, question, answer: { num: an, den: ad }, explanation, inputType: "fraction" };
+  } else {
+    if (scaled2 > scaled1) { [n1, n2] = [n2, n1]; [d1, d2] = [d2, d1]; }
+    const s1 = n1 * (lcd / d1);
+    const s2 = n2 * (lcd / d2);
+    resultNum = s1 - s2;
+    const [an, ad] = simplifyFraction(resultNum, lcd);
+    question = `${n1}/${d1} - ${n2}/${d2} = ? (as a fraction, e.g. 3/4)`;
+    explanation = `Find a common denominator (${lcd}): ${n1}/${d1} = ${s1}/${lcd} and ${n2}/${d2} = ${s2}/${lcd}. Subtract the numerators: ${s1} - ${s2} = ${resultNum}. So the difference is ${resultNum}/${lcd}, which simplifies to ${an}/${ad}.`;
+    return { topic: "Fractions & Decimals", icon: "½", tier, question, answer: { num: an, den: ad }, explanation, inputType: "fraction" };
+  }
+}
+
+function genWordProblem(tier) {
+  const name = randChoice(NAMES);
+  const item = randChoice(ITEMS);
+  const twoStep = tier >= 4 && Math.random() < 0.5;
+  const maxN = 10 + tier * 8;
+
+  if (!twoStep) {
+    const kind = randChoice(["add", "sub", "mul", "div"]);
+    let question, answer, explanation;
+    if (kind === "add") {
+      const a = randInt(5, maxN), b = randInt(5, maxN);
+      answer = a + b;
+      question = `${name} has ${a} ${item}. A friend gives ${name} ${b} more. How many ${item} does ${name} have now?`;
+      explanation = `Add what ${name} started with to what was given: ${a} + ${b} = ${answer}.`;
+    } else if (kind === "sub") {
+      let a = randInt(5, maxN), b = randInt(1, maxN);
+      if (b > a) [a, b] = [b, a];
+      answer = a - b;
+      question = `${name} has ${a} ${item} and gives away ${b}. How many ${item} does ${name} have left?`;
+      explanation = `Subtract the ones given away: ${a} - ${b} = ${answer}.`;
+    } else if (kind === "mul") {
+      const groups = randInt(2, 4 + Math.floor(tier / 2));
+      const perGroup = randInt(2, 6 + tier);
+      answer = groups * perGroup;
+      question = `${name} has ${groups} bags with ${perGroup} ${item} in each bag. How many ${item} are there in total?`;
+      explanation = `Multiply the number of bags by the number in each: ${groups} × ${perGroup} = ${answer}.`;
+    } else {
+      const groups = randInt(2, 4 + Math.floor(tier / 2));
+      const perGroup = randInt(2, 6 + tier);
+      const total = groups * perGroup;
+      answer = perGroup;
+      question = `${name} has ${total} ${item} split evenly into ${groups} bags. How many ${item} are in each bag?`;
+      explanation = `Divide the total by the number of bags: ${total} ÷ ${groups} = ${answer}.`;
+    }
+    return { topic: "Word Problems", icon: "📝", tier, question, answer, explanation, inputType: "number" };
+  }
+
+  const start = randInt(10, maxN);
+  const given = randInt(2, Math.max(3, Math.floor(start / 2)));
+  const groups = randInt(2, 5);
+  const remaining = start - given;
+  const perGroup = groups;
+  const scaled = remaining * perGroup;
+  const answer = scaled;
+  const question = `${name} has ${start} ${item}. First, ${name} gives away ${given}. Then ${name} finds a box with ${perGroup} times as many ${item} as are left. How many ${item} are in the box?`;
+  const explanation = `First subtract: ${start} - ${given} = ${remaining} ${item} left. Then multiply by ${perGroup}: ${remaining} × ${perGroup} = ${answer}.`;
+  return { topic: "Word Problems", icon: "📝", tier, question, answer, explanation, inputType: "number" };
+}
+
+function genPrealgebra(tier) {
+  if (tier <= 2 && Math.random() < 0.5) {
+    const start = randInt(1, 10);
+    const step = randInt(2, 6);
+    const kind = randChoice(["arith", "geo"]);
+    if (kind === "arith" || start * step > 40) {
+      const seq = [start, start + step, start + 2 * step, start + 3 * step];
+      const answer = start + 4 * step;
+      const question = `What comes next in the pattern: ${seq.join(", ")}, __ ?`;
+      const explanation = `Each number increases by ${step}. So the next number is ${seq[3]} + ${step} = ${answer}.`;
+      return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer, explanation, inputType: "number" };
+    } else {
+      const seq = [start, start * step, start * step * step];
+      const answer = start * step * step * step;
+      const question = `What comes next in the pattern: ${seq.join(", ")}, __ ?`;
+      const explanation = `Each number is multiplied by ${step}. So the next number is ${seq[2]} × ${step} = ${answer}.`;
+      return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer, explanation, inputType: "number" };
+    }
+  }
+
+  if (tier <= 4) {
+    const a = randInt(2, 10 + tier * 2);
+    const x = randInt(2, 10 + tier * 2);
+    const kind = randChoice(["add", "sub", "mul"]);
+    let question, explanation;
+    if (kind === "add") {
+      const b = a + x;
+      question = `Solve for x: x + ${a} = ${b}`;
+      explanation = `Subtract ${a} from both sides: x = ${b} - ${a} = ${x}.`;
+    } else if (kind === "sub") {
+      const b = x - a;
+      question = `Solve for x: x - ${a} = ${b}`;
+      explanation = `Add ${a} to both sides: x = ${b} + ${a} = ${x}.`;
+    } else {
+      const b = a * x;
+      question = `Solve for x: ${a}x = ${b}`;
+      explanation = `Divide both sides by ${a}: x = ${b} ÷ ${a} = ${x}.`;
+    }
+    return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer: x, explanation, inputType: "number" };
+  }
+
+  if (tier <= 7) {
+    const a = randInt(2, 8);
+    const x = randInt(2, 12);
+    const b = randInt(1, 15);
+    const c = a * x + b;
+    const question = `Solve for x: ${a}x + ${b} = ${c}`;
+    const explanation = `Subtract ${b} from both sides: ${a}x = ${c - b}. Then divide by ${a}: x = ${(c - b)} ÷ ${a} = ${x}.`;
+    return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer: x, explanation, inputType: "number" };
+  }
+
+  const kind = randChoice(["gcf", "lcm", "square"]);
+  if (kind === "square") {
+    const n = randInt(4, 15);
+    const answer = n * n;
+    const question = `What is ${n}² (${n} squared)?`;
+    const explanation = `Squaring a number means multiplying it by itself: ${n} × ${n} = ${answer}.`;
+    return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer, explanation, inputType: "number" };
+  } else if (kind === "gcf") {
+    const g = randInt(2, 8);
+    const a = g * randInt(2, 6);
+    const b = g * randInt(2, 6);
+    const answer = gcd(a, b);
+    const question = `What is the greatest common factor of ${a} and ${b}?`;
+    const explanation = `List the factors of each number and find the largest one they share. The greatest common factor of ${a} and ${b} is ${answer}.`;
+    return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer, explanation, inputType: "number" };
+  } else {
+    const a = randInt(2, 8);
+    const b = randInt(2, 8);
+    const answer = (a * b) / gcd(a, b);
+    const question = `What is the least common multiple of ${a} and ${b}?`;
+    const explanation = `Find the smallest number that both ${a} and ${b} divide into evenly. The least common multiple of ${a} and ${b} is ${answer}.`;
+    return { topic: "Pre-Algebra & Logic", icon: "🧩", tier, question, answer, explanation, inputType: "number" };
+  }
+}
+
+function genGeometry(tier) {
+  const candidates = ["rectangle"];
+  if (tier >= 1) candidates.push("triangle");
+  if (tier >= 3) candidates.push("circle");
+  if (tier >= 4) candidates.push("angle");
+  if (tier >= 6) candidates.push("composite");
+  const kind = randChoice(candidates);
+
+  if (kind === "rectangle") {
+    const w = randInt(3, 6 + tier);
+    const h = randInt(3, 6 + tier);
+    const askArea = Math.random() < 0.5;
+    const answer = askArea ? w * h : 2 * (w + h);
+    const label = askArea ? "area" : "perimeter";
+    const explanation = askArea
+      ? `Area of a rectangle = length × width = ${w} × ${h} = ${answer}.`
+      : `Perimeter of a rectangle = 2 × (length + width) = 2 × (${w} + ${h}) = ${answer}.`;
+    const svg = (
+      <svg viewBox="0 0 220 160" className="w-56 h-40 mx-auto">
+        <rect x="40" y="30" width="140" height="90" fill="#ddd6fe" stroke="#7c3aed" strokeWidth="3" rx="4" />
+        <text x="110" y="20" textAnchor="middle" fontSize="16" fill="#5b21b6" fontWeight="bold">{w}</text>
+        <text x="25" y="80" textAnchor="middle" fontSize="16" fill="#5b21b6" fontWeight="bold">{h}</text>
+      </svg>
+    );
+    return { topic: "Geometry", icon: "📏", tier, question: `Find the ${label} of this rectangle:`, answer, explanation, inputType: "number", svg };
+  }
+
+  if (kind === "triangle") {
+    let base = randInt(2, 5 + Math.floor(tier / 2)) * 2;
+    let height = randInt(2, 5 + Math.floor(tier / 2));
+    const answer = (base * height) / 2;
+    const explanation = `Area of a triangle = (base × height) ÷ 2 = (${base} × ${height}) ÷ 2 = ${answer}.`;
+    const svg = (
+      <svg viewBox="0 0 220 160" className="w-56 h-40 mx-auto">
+        <polygon points="110,25 30,130 190,130" fill="#bbf7d0" stroke="#16a34a" strokeWidth="3" />
+        <line x1="110" y1="25" x2="110" y2="130" stroke="#16a34a" strokeWidth="2" strokeDasharray="4,4" />
+        <text x="150" y="80" textAnchor="middle" fontSize="16" fill="#15803d" fontWeight="bold">h={height}</text>
+        <text x="110" y="150" textAnchor="middle" fontSize="16" fill="#15803d" fontWeight="bold">base={base}</text>
+      </svg>
+    );
+    return { topic: "Geometry", icon: "📏", tier, question: `Find the area of this triangle:`, answer, explanation, inputType: "number", svg };
+  }
+
+  if (kind === "circle") {
+    const r = randInt(2, 4 + Math.floor(tier / 2));
+    const askArea = Math.random() < 0.5;
+    const answer = askArea ? round1(3.14 * r * r) : round1(2 * 3.14 * r);
+    const label = askArea ? "area" : "circumference";
+    const explanation = askArea
+      ? `Area of a circle ≈ π × r² = 3.14 × ${r} × ${r} = ${answer}.`
+      : `Circumference of a circle ≈ 2 × π × r = 2 × 3.14 × ${r} = ${answer}.`;
+    const svg = (
+      <svg viewBox="0 0 220 160" className="w-56 h-40 mx-auto">
+        <circle cx="110" cy="80" r={30 + r * 5} fill="#bfdbfe" stroke="#2563eb" strokeWidth="3" />
+        <line x1="110" y1="80" x2={110 + 30 + r * 5} y2="80" stroke="#1d4ed8" strokeWidth="2" />
+        <text x={110 + (30 + r * 5) / 2} y="72" textAnchor="middle" fontSize="16" fill="#1d4ed8" fontWeight="bold">r={r}</text>
+      </svg>
+    );
+    return { topic: "Geometry", icon: "📏", tier, question: `Find the ${label} of this circle (use π ≈ 3.14, round to the nearest tenth):`, answer, explanation, inputType: "decimal", svg };
+  }
+
+  if (kind === "angle") {
+    const kind2 = randChoice(["straight", "triangle"]);
+    if (kind2 === "straight") {
+      const a1 = randInt(20, 150);
+      const answer = 180 - a1;
+      const explanation = `Angles on a straight line add up to 180°. So x = 180° - ${a1}° = ${answer}°.`;
+      const svg = (
+        <svg viewBox="0 0 220 140" className="w-56 h-36 mx-auto">
+          <line x1="20" y1="110" x2="200" y2="110" stroke="#334155" strokeWidth="3" />
+          <line x1="90" y1="110" x2="140" y2="30" stroke="#f59e0b" strokeWidth="3" />
+          <text x="65" y="95" fontSize="15" fill="#b45309" fontWeight="bold">{a1}°</text>
+          <text x="150" y="95" fontSize="15" fill="#b45309" fontWeight="bold">x°</text>
+        </svg>
+      );
+      return { topic: "Geometry", icon: "📏", tier, question: `Two angles sit on a straight line. Find the missing angle x:`, answer, explanation, inputType: "number", svg };
+    } else {
+      const a1 = randInt(30, 100);
+      const a2 = randInt(30, 100 - Math.max(0, a1 - 70));
+      const answer = 180 - a1 - a2;
+      const explanation = `The angles inside a triangle always add up to 180°. So x = 180° - ${a1}° - ${a2}° = ${answer}°.`;
+      const svg = (
+        <svg viewBox="0 0 220 160" className="w-56 h-40 mx-auto">
+          <polygon points="110,25 30,130 190,130" fill="#fef3c7" stroke="#d97706" strokeWidth="3" />
+          <text x="110" y="45" fontSize="14" fill="#92400e" fontWeight="bold">x°</text>
+          <text x="45" y="122" fontSize="14" fill="#92400e" fontWeight="bold">{a1}°</text>
+          <text x="165" y="122" fontSize="14" fill="#92400e" fontWeight="bold">{a2}°</text>
+        </svg>
+      );
+      return { topic: "Geometry", icon: "📏", tier, question: `Find the missing angle x in this triangle:`, answer, explanation, inputType: "number", svg };
+    }
+  }
+
+  // composite: a tall column (w1 wide, full height h1+h2) plus a bottom-right
+  // extension (w2 wide, h2 tall) attached below, so the two rectangles never overlap.
+  const w1 = randInt(4, 8), h1 = randInt(2, 5);
+  const w2 = randInt(2, 5), h2 = randInt(2, 5);
+  const columnArea = w1 * (h1 + h2);
+  const extensionArea = w2 * h2;
+  const answer = columnArea + extensionArea;
+  const explanation = `Split the shape into two rectangles: the tall column is ${w1} × ${h1 + h2} = ${columnArea}, and the extension is ${w2} × ${h2} = ${extensionArea}. Add them: ${columnArea} + ${extensionArea} = ${answer}.`;
+  const svg = (
+    <svg viewBox="0 0 220 160" className="w-56 h-40 mx-auto">
+      <polygon points="30,30 150,30 150,70 190,70 190,130 30,130" fill="#fbcfe8" stroke="#db2777" strokeWidth="3" />
+      <text x="90" y="20" fontSize="14" fill="#9d174d" fontWeight="bold">{w1}</text>
+      <text x="15" y="82" fontSize="14" fill="#9d174d" fontWeight="bold">{h1 + h2}</text>
+      <text x="170" y="60" fontSize="14" fill="#9d174d" fontWeight="bold">{w2}</text>
+      <text x="205" y="102" fontSize="14" fill="#9d174d" fontWeight="bold">{h2}</text>
+    </svg>
+  );
+  return { topic: "Geometry", icon: "📏", tier, question: `Find the total area of this L-shaped figure:`, answer, explanation, inputType: "number", svg };
+}
+
+const GENERATORS = [genArithmetic, genFractionsDecimals, genWordProblem, genPrealgebra, genGeometry];
+
+function generateProblem(streak) {
+  const tier = tierForStreak(streak);
+  const gen = randChoice(GENERATORS);
+  return gen(tier);
+}
+
+/* ============================== ANSWER CHECKING ============================== */
+
+function checkAnswer(problem, raw) {
+  const trimmed = raw.trim();
+  if (problem.inputType === "fraction") {
+    const m = trimmed.match(/^(-?\d+)\s*\/\s*(\d+)$/);
+    if (m) {
+      const un = parseInt(m[1], 10), ud = parseInt(m[2], 10);
+      return un * problem.answer.den === problem.answer.num * ud;
+    }
+    const asDecimal = parseFloat(trimmed);
+    if (!isNaN(asDecimal)) {
+      return Math.abs(asDecimal - problem.answer.num / problem.answer.den) < 0.01;
+    }
+    return false;
+  }
+  const val = parseFloat(trimmed);
+  if (isNaN(val)) return false;
+  if (problem.inputType === "decimal") {
+    return Math.abs(val - problem.answer) < 0.05;
+  }
+  return Math.abs(val - problem.answer) < 1e-9;
+}
+
+function formatAnswer(problem) {
+  if (problem.inputType === "fraction") return `${problem.answer.num}/${problem.answer.den}`;
+  return String(problem.answer);
+}
+
+/* ============================== PERSISTENCE ============================== */
+
+const STORAGE_KEY = "mathStreakSave_v1";
+const BADGE_MILESTONES = [
+  { streak: 5, id: "bronze", name: "Bronze Brain", icon: "🥉" },
+  { streak: 10, id: "silver", name: "Silver Solver", icon: "🥈" },
+  { streak: 15, id: "gold", name: "Gold Genius", icon: "🥇" },
+  { streak: 25, id: "diamond", name: "Diamond Mind", icon: "💎" },
+  { streak: 40, id: "crown", name: "Math Royalty", icon: "👑" },
+  { streak: 60, id: "rocket", name: "Math Legend", icon: "🚀" },
+];
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { bestStreak: 0, bestScore: 0, badges: [] };
+    const parsed = JSON.parse(raw);
+    return { bestStreak: parsed.bestStreak || 0, bestScore: parsed.bestScore || 0, badges: parsed.badges || [] };
+  } catch (e) {
+    return { bestStreak: 0, bestScore: 0, badges: [] };
+  }
+}
+function writeSave(save) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+}
+
+/* ============================== UI COMPONENTS ============================== */
+
+function BadgeShelf({ unlockedIds, compact }) {
+  return (
+    <div className={`flex flex-wrap gap-3 justify-center ${compact ? "" : "mt-4"}`}>
+      {BADGE_MILESTONES.map(b => {
+        const unlocked = unlockedIds.includes(b.id);
+        return (
+          <div key={b.id} title={`${b.name} — streak of ${b.streak}`} className="flex flex-col items-center w-16">
+            <div className={`text-3xl ${unlocked ? "" : "badge-locked"}`}>{b.icon}</div>
+            <div className={`text-[10px] text-center mt-1 font-semibold ${unlocked ? "text-slate-700" : "text-slate-400"}`}>{b.name}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StartScreen({ save, onStart }) {
+  return (
+    <div className="max-w-xl mx-auto px-6 py-10 text-center">
+      <div className="text-6xl mb-2">🧮</div>
+      <h1 className="font-display text-4xl font-extrabold text-violet-700 drop-shadow-sm">Math Streak!</h1>
+      <p className="mt-3 text-slate-600 font-semibold">
+        Answer as many problems in a row as you can — arithmetic, fractions, word problems, pre-algebra, and geometry.
+        The streak gets harder the longer you go. One miss and you start over!
+      </p>
+
+      <div className="mt-6 grid grid-cols-2 gap-4">
+        <div className="bg-white/80 rounded-2xl border-2 border-violet-200 px-4 py-3 shadow-sm">
+          <div className="text-xs font-bold uppercase tracking-wide text-violet-500">Best Streak</div>
+          <div className="text-3xl font-extrabold font-display text-violet-700">{save.bestStreak}</div>
+        </div>
+        <div className="bg-white/80 rounded-2xl border-2 border-emerald-200 px-4 py-3 shadow-sm">
+          <div className="text-xs font-bold uppercase tracking-wide text-emerald-500">Best Score</div>
+          <div className="text-3xl font-extrabold font-display text-emerald-700">{save.bestScore}</div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <div className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Badges</div>
+        <BadgeShelf unlockedIds={save.badges} />
+      </div>
+
+      <button
+        onClick={onStart}
+        className="mt-8 font-display text-xl font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-10 py-4 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-transform"
+      >
+        Start Playing! 🚀
+      </button>
+    </div>
+  );
+}
+
+function HUD({ streak, score, tier, bestStreak }) {
+  return (
+    <div className="flex items-center justify-between max-w-xl mx-auto px-2 mb-4">
+      <div className="bg-white/80 rounded-xl px-4 py-2 border-2 border-orange-200 shadow-sm text-center">
+        <div className="text-[10px] font-bold uppercase text-orange-500">Streak</div>
+        <div className="text-2xl font-extrabold font-display text-orange-600">🔥 {streak}</div>
+      </div>
+      <div className="bg-white/80 rounded-xl px-4 py-2 border-2 border-sky-200 shadow-sm text-center">
+        <div className="text-[10px] font-bold uppercase text-sky-500">Level</div>
+        <div className="text-2xl font-extrabold font-display text-sky-600">{tier}</div>
+      </div>
+      <div className="bg-white/80 rounded-xl px-4 py-2 border-2 border-emerald-200 shadow-sm text-center">
+        <div className="text-[10px] font-bold uppercase text-emerald-500">Score</div>
+        <div className="text-2xl font-extrabold font-display text-emerald-600">{score}</div>
+      </div>
+      <div className="bg-white/80 rounded-xl px-4 py-2 border-2 border-violet-200 shadow-sm text-center">
+        <div className="text-[10px] font-bold uppercase text-violet-500">Best</div>
+        <div className="text-2xl font-extrabold font-display text-violet-600">{bestStreak}</div>
+      </div>
+    </div>
+  );
+}
+
+function PlayScreen({ streak, score, bestStreak, problem, onAnswer }) {
+  const [value, setValue] = useState("");
+  const [shake, setShake] = useState(false);
+  const [flash, setFlash] = useState(null); // 'pop' feedback for correct
+  const inputRef = useRef(null);
+  const tier = tierForStreak(streak);
+
+  useEffect(() => {
+    setValue("");
+    if (inputRef.current) inputRef.current.focus();
+  }, [problem]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!value.trim()) return;
+    const correct = checkAnswer(problem, value);
+    if (correct) {
+      setFlash(true);
+      setTimeout(() => setFlash(null), 500);
+      onAnswer(true, value);
+    } else {
+      setShake(true);
+      setTimeout(() => setShake(false), 400);
+      onAnswer(false, value);
+    }
+  };
+
+  return (
+    <div className="max-w-xl mx-auto px-4">
+      <HUD streak={streak} score={score} tier={tier} bestStreak={bestStreak} />
+      <div className={`bg-white rounded-3xl shadow-xl border-4 ${flash ? "border-emerald-400" : "border-violet-200"} p-6 relative overflow-hidden animate-pop ${shake ? "animate-shake" : ""}`}>
+        {flash && <div className="absolute top-2 right-4 text-3xl animate-float">+{tier * 10} ⭐</div>}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">{problem.icon}</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-violet-500 bg-violet-100 px-3 py-1 rounded-full">{problem.topic}</span>
+        </div>
+        {problem.svg && <div className="mb-3">{problem.svg}</div>}
+        <div className="font-display text-2xl font-bold text-slate-800 mb-5 leading-snug">{problem.question}</div>
+        <form onSubmit={submit} className="flex gap-3">
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="decimal"
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            placeholder={problem.inputType === "fraction" ? "e.g. 3/4" : "your answer"}
+            className="flex-1 text-xl font-mono font-bold px-4 py-3 rounded-2xl border-2 border-slate-300 focus:border-violet-500 focus:outline-none text-center"
+            autoComplete="off"
+          />
+          <button type="submit" className="font-display font-bold text-lg bg-violet-600 hover:bg-violet-700 text-white px-6 rounded-2xl shadow-md transition-colors">
+            Go!
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ResultScreen({ roundResult, save, onPlayAgain, onHome }) {
+  const { streak, score, problem, userAnswer, topicCounts, durationSec, newBadges } = roundResult;
+  return (
+    <div className="max-w-xl mx-auto px-4 py-6">
+      <div className="bg-white rounded-3xl shadow-xl border-4 border-rose-200 p-6 text-center animate-pop">
+        <div className="text-5xl mb-2">💥</div>
+        <h2 className="font-display text-3xl font-extrabold text-rose-600">Round Over!</h2>
+        <div className="mt-4 bg-rose-50 rounded-2xl p-4 text-left">
+          <div className="text-xs font-bold uppercase text-rose-400 mb-1">{problem.topic}</div>
+          <div className="font-semibold text-slate-800">{problem.question}</div>
+          <div className="mt-2 text-sm">
+            <span className="font-bold text-rose-600">Your answer:</span> {userAnswer || "(blank)"}<br/>
+            <span className="font-bold text-emerald-600">Correct answer:</span> {formatAnswer(problem)}
+          </div>
+          <div className="mt-2 text-sm text-slate-600 italic">{problem.explanation}</div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className="bg-orange-50 rounded-xl px-2 py-3 border-2 border-orange-200">
+            <div className="text-[10px] font-bold uppercase text-orange-500">Streak</div>
+            <div className="text-2xl font-extrabold font-display text-orange-600">{streak}</div>
+          </div>
+          <div className="bg-emerald-50 rounded-xl px-2 py-3 border-2 border-emerald-200">
+            <div className="text-[10px] font-bold uppercase text-emerald-500">Score</div>
+            <div className="text-2xl font-extrabold font-display text-emerald-600">{score}</div>
+          </div>
+          <div className="bg-sky-50 rounded-xl px-2 py-3 border-2 border-sky-200">
+            <div className="text-[10px] font-bold uppercase text-sky-500">Time</div>
+            <div className="text-2xl font-extrabold font-display text-sky-600">{durationSec}s</div>
+          </div>
+        </div>
+
+        {Object.keys(topicCounts).length > 0 && (
+          <div className="mt-4 text-left">
+            <div className="text-xs font-bold uppercase text-slate-400 mb-1">Topics this round</div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(topicCounts).map(([topic, count]) => (
+                <span key={topic} className="text-xs font-semibold bg-violet-100 text-violet-700 px-3 py-1 rounded-full">{topic}: {count}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {newBadges.length > 0 && (
+          <div className="mt-4 bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-3">
+            <div className="text-sm font-bold text-yellow-700 mb-2">🎉 New badge{newBadges.length > 1 ? "s" : ""} unlocked!</div>
+            <div className="flex justify-center gap-4">
+              {newBadges.map(b => (
+                <div key={b.id} className="flex flex-col items-center">
+                  <div className="text-4xl">{b.icon}</div>
+                  <div className="text-xs font-semibold">{b.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 text-xs text-slate-400">
+          Best streak ever: <span className="font-bold text-violet-600">{save.bestStreak}</span> · Best score ever: <span className="font-bold text-emerald-600">{save.bestScore}</span>
+        </div>
+
+        <div className="mt-6 flex gap-3 justify-center">
+          <button onClick={onHome} className="font-display font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-3 rounded-2xl transition-colors">Home</button>
+          <button onClick={onPlayAgain} className="font-display font-bold text-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-8 py-3 rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-transform">
+            Play Again 🔁
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== APP ============================== */
+
+function App() {
+  const [save, setSave] = useState(loadSave);
+  const [screen, setScreen] = useState("start"); // start | play | result
+  const [streak, setStreak] = useState(0);
+  const [score, setScore] = useState(0);
+  const [problem, setProblem] = useState(null);
+  const [topicCounts, setTopicCounts] = useState({});
+  const [roundStart, setRoundStart] = useState(null);
+  const [roundResult, setRoundResult] = useState(null);
+
+  const startRound = useCallback(() => {
+    setStreak(0);
+    setScore(0);
+    setTopicCounts({});
+    setRoundStart(Date.now());
+    setProblem(generateProblem(0));
+    setScreen("play");
+  }, []);
+
+  const handleAnswer = useCallback((correct, userAnswer) => {
+    if (correct) {
+      const newStreak = streak + 1;
+      const tier = tierForStreak(streak);
+      const newScore = score + tier * 10;
+      const newCounts = { ...topicCounts, [problem.topic]: (topicCounts[problem.topic] || 0) + 1 };
+      setStreak(newStreak);
+      setScore(newScore);
+      setTopicCounts(newCounts);
+      setProblem(generateProblem(newStreak));
+    } else {
+      const durationSec = Math.max(1, Math.round((Date.now() - roundStart) / 1000));
+      const earnedBadges = BADGE_MILESTONES.filter(b => streak >= b.streak);
+      const earnedIds = earnedBadges.map(b => b.id);
+      const newBadges = earnedBadges.filter(b => !save.badges.includes(b.id));
+      const newSave = {
+        bestStreak: Math.max(save.bestStreak, streak),
+        bestScore: Math.max(save.bestScore, score),
+        badges: Array.from(new Set([...save.badges, ...earnedIds])),
+      };
+      writeSave(newSave);
+      setSave(newSave);
+      setRoundResult({ streak, score, problem, userAnswer, topicCounts, durationSec, newBadges });
+      setScreen("result");
+    }
+  }, [streak, score, topicCounts, problem, roundStart, save]);
+
+  return (
+    <div className="min-h-screen py-8">
+      {screen === "start" && <StartScreen save={save} onStart={startRound} />}
+      {screen === "play" && problem && (
+        <PlayScreen streak={streak} score={score} bestStreak={save.bestStreak} problem={problem} onAnswer={handleAnswer} />
+      )}
+      {screen === "result" && roundResult && (
+        <ResultScreen roundResult={roundResult} save={save} onPlayAgain={startRound} onHome={() => setScreen("start")} />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

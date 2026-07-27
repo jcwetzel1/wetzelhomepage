@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const SECTIONS = [{ name: "Baseball", href: "/baseball/scores" }];
+const SECTIONS = [
+  { name: "Baseball", href: "/baseball/scores" },
+  { name: "Games", href: "/games/math-streak" },
+];
 
 export default function Sidebar() {
   const pathname = usePathname();
