@@ -12,7 +12,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <nav className="shrink-0 border-b sm:border-b-0 sm:border-r border-gray-200 bg-white px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 sm:pt-6 sm:pb-6 sm:w-48 sm:h-full">
+    <nav className="shrink-0 border-b sm:border-b-0 sm:border-r border-gray-200 bg-white px-3 pt-[max(1.75rem,calc(env(safe-area-inset-top)+1rem))] pb-3 sm:pt-6 sm:pb-6 sm:w-48 sm:h-full">
       <div className="hidden sm:block text-lg font-bold text-gray-900 px-2 mb-6">
         Home Dashboard
       </div>
@@ -23,7 +23,7 @@ export default function Sidebar() {
             <li key={section.href} className="shrink-0">
               <Link
                 href={section.href}
-                className={`block rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap ${
+                className={`block rounded-md px-4 py-3 sm:px-3 sm:py-2 text-sm font-medium whitespace-nowrap ${
                   active
                     ? "bg-red-50 text-red-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
