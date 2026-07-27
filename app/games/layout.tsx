@@ -9,7 +9,7 @@ export default function GamesLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-full">
       <div className="border-b border-gray-200 bg-white px-6 shrink-0">
         <nav className="flex gap-6">
           {TABS.map((tab) => {
