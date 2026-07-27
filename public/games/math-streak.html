@@ -622,7 +622,7 @@ function PlayScreen({ streak, score, bestStreak, problem, onAnswer }) {
         </div>
         {problem.svg && <div className="mb-3">{problem.svg}</div>}
         <div className="font-display text-2xl font-bold text-slate-800 mb-5 leading-snug">{problem.question}</div>
-        <form onSubmit={submit} className="flex gap-3">
+        <form onSubmit={submit} className="flex flex-col sm:flex-row gap-3">
           <input
             ref={inputRef}
             type="text"
@@ -633,7 +633,7 @@ function PlayScreen({ streak, score, bestStreak, problem, onAnswer }) {
             className="flex-1 text-xl font-mono font-bold px-4 py-3 rounded-2xl border-2 border-slate-300 focus:border-violet-500 focus:outline-none text-center"
             autoComplete="off"
           />
-          <button type="submit" className="font-display font-bold text-lg bg-violet-600 hover:bg-violet-700 text-white px-6 rounded-2xl shadow-md transition-colors">
+          <button type="submit" className="font-display font-bold text-lg bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 sm:py-0 rounded-2xl shadow-md transition-colors">
             Go!
           </button>
         </form>

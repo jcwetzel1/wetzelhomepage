@@ -12,7 +12,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <nav className="shrink-0 border-b sm:border-b-0 sm:border-r border-gray-200 bg-white px-3 py-2 sm:py-6 sm:w-48 sm:h-full">
+    <nav className="shrink-0 border-b sm:border-b-0 sm:border-r border-gray-200 bg-white px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 sm:pt-6 sm:pb-6 sm:w-48 sm:h-full">
       <div className="hidden sm:block text-lg font-bold text-gray-900 px-2 mb-6">
         Home Dashboard
       </div>
